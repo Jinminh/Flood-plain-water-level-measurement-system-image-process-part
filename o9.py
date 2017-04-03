@@ -7,8 +7,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 import math
 
-
 BLUE = (255,0,0)
+original_img = "sample.png"
+
 
 # 已经有两个点，求一元一次方程y=kx+d的系数k和常数项d，判断地平线
 def find_skyline(x1, y1, x2, y2, img):
@@ -28,7 +29,7 @@ def vignette_filter(img, pixels_falloff = 0, types=0):
     col_ctr = width / 2
     max_img_rad = math.sqrt(row_ctr * row_ctr + col_ctr * col_ctr)
     res = img.copy()
-    
+
     if types:
         trow = pixels_falloff
         lcol = pixels_falloff
@@ -43,12 +44,15 @@ def vignette_filter(img, pixels_falloff = 0, types=0):
                 if dis > radius:
                     if dis > radius + pixels_falloff:                   
                         res[i, j] = img[i, j] * (dis) / radius
+                        # cv2.imshow('res2', res)
                     else:
                         sigma = (dis - radius) / pixels_falloff
                         res[i, j] = img[i, j] * (1 - sigma * sigma)
+                        # cv2.imshow('res3', res)
                 else:               
                     pass
             else:
+            	print('not here')
                 dis1 = min(abs(i - trow), abs(i - brow))
                 dis2 = min(abs(j - lcol), abs(j-rcol))
                 if i<= brow and i >= trow and j >= lcol and j <= rcol:
@@ -56,6 +60,7 @@ def vignette_filter(img, pixels_falloff = 0, types=0):
                 else:
                     sigma = (dis1 + dis2) * (dis1 + dis2) / (dis1 * dis1 + dis2 * dis2)
                     res[i, j] = img[i, j] * sigma
+
     return res
 
 
@@ -68,12 +73,19 @@ def affline_rotate(img, pts1, pts2):
 
 if __name__ == "__main__":  
     
-    img = cv2.imread("1.png", 0)  #Canny只能处理灰度图，所以将读取的图像转成灰度图  
+    img = cv2.imread(original_img, 0)  #Canny只能处理灰度图，所以将读取的图像转成灰度图  
 
-    cv2.imshow('original image', img)
-    img2 = vignette_filter(img, 0.3)   
-    img = cv2.blur(img, (5, 5))    
-    img2 = cv2.blur(img2, (10, 10))    
+    # cv2.imshow('original image', img)
+    img2 = vignette_filter(img, 0.3)
+    # cv2.imshow('vig', img2)
+
+
+    img = cv2.blur(img, (5, 5)) 
+   
+    img2 = cv2.blur(img2, (10, 10)) 
+
+
+
     img = cv2.addWeighted(img, 0.80, img2, 0.20, 1)    
     # cv2.imshow('after vignette_filter', img)
 
@@ -81,10 +93,15 @@ if __name__ == "__main__":
     img = cv2.blur(img, (15, 15))
     clahe = cv2.createCLAHE(clipLimit=2.00, tileGridSize=(11, 11))
     img = clahe.apply(img)   
-    ret2,detected_edges = cv2.threshold(img, 10, 230, cv2.THRESH_BINARY+cv2.THRESH_OTSU)    
-    edges = cv2.Canny(detected_edges,0.1,1.0, apertureSize = 3)  
-    dst = cv2.bitwise_and(img,img,mask = edges)
+    ret2,detected_edges = cv2.threshold(img, 10, 230, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    cv2.imshow('de', detected_edges)
 
+
+    edges = cv2.Canny(detected_edges,0.1,1.0, apertureSize = 3)
+    cv2.imshow('ee', edges)    
+
+    dst = cv2.bitwise_and(img,img,mask = edges)
+    cv2.imshow('dst', dst) 
     ## 因为地平线为一条直线，该部分可以发现直线，并将地平线以上部分置为背景色
     minLineLength = 100
     maxLineGap = 10
@@ -92,10 +109,13 @@ if __name__ == "__main__":
     a1, b1, a2, b2 = (0, 0, 0, 0)
     dis = 0
     ## 采用最长的直线作为地平线。可能会有很多短直线
+
+    print(lines[0])
     for x1,y1,x2,y2 in lines[0]:
         if (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) > dis:
              a1, b1, a2, b2 = (x1,y1,x2,y2)  
     (k, d)= find_skyline(a1,b1,a2,b2, img)
+
     print "line: ", k,d
     # 将地平线以上置为空
     for i in range(dst.shape[0]):
@@ -105,10 +125,11 @@ if __name__ == "__main__":
                 dst[i, j] = 0
 
     cv2.imshow('canny lines', dst)
+
     # cv2.imwrite('houghlines5.jpg',img)
 
     ## 根据canny line，将原图形中边界标出，
-    original = cv2.imread("1.png")
+    original = cv2.imread(original_img)
     for row in range(original.shape[0]):	
     	for bt in range( original.shape[1]):
     		if dst[row, bt] == 0:
@@ -127,13 +148,14 @@ if __name__ == "__main__":
     pts1 = np.float32([[int(srcy1) , int(srcx1)],[srcy2,srcx2],[srcy3,srcx3]])  
     pts2 = np.float32([[img.shape[1] * 0.9, 0],[0, img.shape[0] / 7],[img.shape[1]*0.75, img.shape[0]]])
 
-    img = cv2.imread('1.png', 0) 
+    img = cv2.imread(original_img, 0) 
     img = affline_rotate(img,pts1, pts2)
     detected_edges = affline_rotate(detected_edges, pts1, pts2) 
     result = affline_rotate(original, pts1,pts2) 	
-    cv2.imshow('affine original image', img)	
-    cv2.imshow('affine edges', detected_edges)
+    # cv2.imshow('affine original image', img)	
+    # cv2.imshow('affine edges', detected_edges)
     cv2.imshow('affine canny result', result)
+
     # cv2.imwrite('result.png', original)
 
     if cv2.waitKey(0) == 27:
